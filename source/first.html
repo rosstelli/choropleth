@@ -12,6 +12,7 @@
 
 		.counties {
 		  fill: none;
+		  stroke: #FFCC88; /* Color used for county lines */
 		}
 
 		#states .active {
@@ -20,7 +21,7 @@
 
 		.states {
 		  fill: none;
-		  stroke: #fff;
+		  stroke: #fff; /* stroke: #000000; */ /* Color used for state lines */
 		  stroke-linejoin: round;
 		}
 /*
@@ -39,7 +40,9 @@
 	<body>
 	    
 	    <input id="slide" type="range" min="0" max="100" step="1" value="0" onchange="updateSlider(this.value)">
-        <div id="sliderAmount">1.00</div>​
+        <div id="sliderAmount">Unemployment > 0.00</div>​
+		<input id="slideMax" type="range" min="0" max="100" step="1" value="100" onchange="updateSliderMax(this.value)">
+        <div id="sliderAmountMax">Unemployment < 1.00</div>​
 		<script src="d3js.org/d3.v3.min.js"></script>
 		<script src="d3js.org/queue.v1.min.js"></script>
 		<script src="d3js.org/topojson.v1.min.js"></script>
@@ -52,35 +55,44 @@
 // http://bl.ocks.org/mbostock/4060606
 // https://bl.ocks.org/mbostock/2206590
 
-var min=0, max=0;
+var min=0, max=0;  // store min and max of unemployment values.
+// Range of colors for the unemployment values.
 var redmin = 0, redmax = 120, greenmin = 0, greenmax = 200, bluemin = 30, bluemax = 255;
-var threshold = 0;
+// Store the upper and lower bound values of the threshold.
+var threshold = 0, thresholdMax = 1;
+// Toggles visibility of states not in the threshold values.
+var toggleThresh = true; 
 
+
+// Function used to convert an unemployment value to a color on the map.
 function getColor(d){
-    //console.log(rateById.get(d.id));
 	var rate = rateById.get(d.id);
-	//console.log(rate + " color " + Math.floor(((247 - 8) * (rate / rateById.get(max))) + 8));
 	return ("rgb(" 
 	    + Math.floor(((redmax - redmin) * ((rateById.get(max) - rate) / rateById.get(max))) + redmin) + ", "
 		+ Math.floor(((greenmax - greenmin) * ((rateById.get(max) - rate) / rateById.get(max))) + greenmin) + ", "
 		+ Math.floor(((bluemax - bluemin) * ((rateById.get(max) - rate) / rateById.get(max))) + bluemin) +")");
 }
 
+// Determines which counties should be colored.
 function thres_color(d) {
     var rate = rateById.get(d.id)
-    if (rate > threshold) {
+    if (rate >= threshold && rate <= thresholdMax) {
 	    return (getColor(d));
 	}
-	return ("rgb(240,240,240)");
+	return ("rgb(240,240,240)"); // Gray value - not in threshold.
 }
 
+// Size of svg window for map.
 var width = 960,
 	height = 600;
 
+// Function to return the unemployment rate given an ID.
 var rateById = d3.map();
 
+// The current county that was clicked and is centered in the svg.
 var centered = null;
 
+// Old function - to be deleted.
 var quantize = d3.scale.quantize()
 	.domain([0, .15])
 	.range(d3.range(9).map(function(i) { return "q" + i + "-9"; }));
@@ -96,63 +108,68 @@ var svg = d3.select("body").append("svg")
 	.attr("width", width)
 	.attr("height", height);
 	
+// Outside rectangle to hold the map.
 svg.append("rect")
 	.attr("class", "background")
 	.attr("width", width)
 	.attr("height", height)
 	.on("click", clicked);
 	
-
+// load the data
 queue()
 	.defer(d3.json, "json/us.json")
 	.defer(d3.tsv, "unemployment.tsv", function(d) { rateById.set(d.id, +d.rate); })
 	.await(ready);
 
 var g = svg.append("g");
+
+//Hold all the counties in order to alter data later.
 var counties;
 	
 function ready(error, us) {
   if (error) throw error;
 
-  counties = g.append("g")
-	  .attr("class", "counties")
-	.selectAll("path")
-	  .data(topojson.feature(us, us.objects.counties).features)
-	.enter().append("path")
-	  .attr("class", function(d) { 
-	      if (rateById.get(min) > rateById.get(d.id) || rateById.get(min) == null) { min = d.id; }
-	      if (rateById.get(max) < rateById.get(d.id) || rateById.get(max) == null) { max = d.id; }
-		  return quantize(rateById.get(d.id)); 
-      })
-	  .attr("d", path)
-	  .attr("fill", getColor)
-	  .on("click", clicked)
-	  .on("mouseover", moused);
+    // Save all the counties.
+    counties = g.append("g")
+	    .attr("class", "counties")
+	  .selectAll("path")
+	    .data(topojson.feature(us, us.objects.counties).features)
+	  .enter().append("path")
+	    .attr("class", function(d) { 
+	        if (rateById.get(min) > rateById.get(d.id) || rateById.get(min) == null) { min = d.id; }
+	        if (rateById.get(max) < rateById.get(d.id) || rateById.get(max) == null) { max = d.id; }
+		    return quantize(rateById.get(d.id)); 
+        })
+	    .attr("d", path)
+	    .attr("fill", getColor)
+	    .on("click", clicked)
+	    .on("mouseover", moused);
 
-	setSlider ();
+	setSlider(); // Set the bounds of the slider(s).
     
-  g.append("path")
-	  .datum(topojson.mesh(us, us.objects.states, function(a, b) { return a !== b; }))
-	  .attr("class", "states")
-	  .attr("d", path)
-	  ;
+    g.append("path")
+	    .datum(topojson.mesh(us, us.objects.states, function(a, b) { return a !== b; }))
+	    .attr("class", "states")
+	    .attr("d", path);
 }
 
 d3.select(self.frameElement).style("height", height + "px");
 
+// Function called if a click is registered
 function clicked(d) {
-  console.log('alert');
-  var x, y, k;
+    if (d === undefined) return;
+    var x, y, k;
 
-  if (d && centered !== d) {
-	// Center around a county or state.
-	var centroid = path.centroid(d);
-	x = centroid[0];
-	y = centroid[1];
-	k = 4;
-	centered = d;
-	var temp_circle = document.getElementById("temp_circle");
-	if (temp_circle != null) {
+    if (d && centered !== d) {
+	    // Center around a county or state.
+	    // d.attr('stroke', '#000000');
+	    var centroid = path.centroid(d);
+	    x = centroid[0];
+	    y = centroid[1];
+	    k = 4;
+	    centered = d;
+	    var temp_circle = document.getElementById("temp_circle");
+	    if (temp_circle != null) {
 		temp_circle = null;
 	}
 	g.selectAll('circle').remove();
@@ -161,47 +178,53 @@ function clicked(d) {
 		.attr("cy", y)
 		.attr("r", 1)
 		.attr("fill", "#ffa500")
-		.attr("id", "temp_circle");
-  } else {
-	x = width / 2;
-	y = height / 2;
-	k = 1;
-	centered = null;
-	
-  }
+		.attr("id", "temp_circle")
+		.attr('stroke', '#000000');
+    } else {
+	    x = width / 2;
+	    y = height / 2;
+	    k = 1;
+	    centered = null;
+    }
 
-  g.selectAll("path")
-	  .classed("active", centered && function(d) { return d === centered; });
+    g.selectAll("path")
+	    .classed("active", centered && function(d) { return d === centered; });
 
-  g.transition()
-	  .duration(750)
-	  .attr("transform", "translate(" + width / 2 + "," + height / 2 + ")scale(" + k + ")translate(" + -x + "," + -y + ")")
-	  .style("stroke-width", 1.5 / k + "px");
+    // Move the map to zoom in
+    g.transition()
+	    .duration(750)
+	    .attr("transform", "translate(" + width / 2 + "," + height / 2 + ")scale(" + k + ")translate(" + -x + "," + -y + ")")
+	    .style("stroke-width", 1.5 / k + "px");
 	  
-  // Add the display of data of the county clicked.
-  document.getElementById("selected_text").innerHTML = d.id;
-  document.getElementById("selected_text2").innerHTML = rateById.get(d.id);
-  
-  
+    // Add the display of data of the county clicked.
+    document.getElementById("selected_text").innerHTML = d.id;
+    document.getElementById("selected_text2").innerHTML = rateById.get(d.id);
 }
 
 
-
+// Function called as the mouse moves.
 function moused (d) {
 	// Add the display of data of the county of the mouseover.
+	if (d === undefined) return;
+	
+	// Change the information displayed.
 	document.getElementById("moused_text").innerHTML = d.id;
-	console.log(d.id);
     document.getElementById("moused_text2").innerHTML = rateById.get(d.id);
-	var centroid = path.centroid(centered);
-	x = centroid[0];
-	y = centroid[1];
 	g.selectAll('circle').remove();
-	g.append("circle")
-		.attr("cx", x)
-		.attr("cy", y)
-		.attr("r", 1)
-		.attr("fill", "#ffa500")
-		.attr("id", "temp_circle");
+	if (centered !== null && centered !== undefined) {
+		var centroid = path.centroid(centered);
+		x = centroid[0];
+		y = centroid[1];
+		
+		g.append("circle")
+			.attr("cx", x)
+			.attr("cy", y)
+			.attr("r", 1)
+			.attr("fill", "#ffa500")
+			.attr("id", "temp_circle")
+			.attr('stroke', '#111111');
+	}
+	// Draw the circle on the county that the mouse is over.
 	if (d !== centered) {		
 		var selected_loc = path.centroid(d);
 		var x1 = selected_loc[0];
@@ -212,29 +235,59 @@ function moused (d) {
 			.attr("cy", y1)
 			.attr("r", 1)
 			.attr("fill", "#66FF00")
-			.attr("id", "temp_selected");
+			.attr("id", "temp_selected")
+			.attr('stroke', '#111111'); /* stroke: #000000; */
 	}
 }
 
-
+// Initialize the values for the slider
 function setSlider () {
     var slide = document.getElementById("slide");
     slide.max = (rateById.get(max) * 100);
     slide.step = rateById.get(max);
-    //console.log('set slider');
+	var slide2 = document.getElementById("slideMax");
+    slide2.value = (rateById.get(max) * 100);
+	slide2.max = (rateById.get(max) * 100);
+    slide2.step = rateById.get(max);
 }
 
 
-// Slider 
+// Update the slider and the map according to the new values.
 function updateSlider(slideAmount) {
     var sliderDiv = document.getElementById("sliderAmount");
     sliderDiv.innerHTML = 'Unemployment > ' + (slideAmount / 100);
 	threshold = (slideAmount / 100);
 	counties.attr("fill", thres_color);
+	toggleThresh = true;
+}
+
+// Update the slider and the map according to the new values.
+function updateSliderMax(slideAmount) {
+    var sliderDiv = document.getElementById("sliderAmountMax");
+    sliderDiv.innerHTML = 'Unemployment < ' + (slideAmount / 100);
+	thresholdMax = (slideAmount / 100);
+	counties.attr("fill", thres_color);
+	toggleThresh = true;
+}
+
+// Keys and their functions
+window.onkeyup = function(e) {
+    var key = e.keyCode ? e.keyCode : e.which;
+    if (key === 82) { // 'r'
+	    // Toggle the display of the thresholds.
+	    if (toggleThresh) {
+		    // Turn on all the counties on the maps, regardless of the thresholds.
+		    counties.attr("fill", getColor);
+		} else {
+		    // Turn on the thresholds again.
+		    counties.attr("fill", thres_color);
+		}
+		toggleThresh = !toggleThresh;
+	}
 }
 		</script>
 		</a>
-		
+		<!-- Display the county information -->
 		<svg width="250" height="600" fill="none" class="background">
 		<g>
 		    <rect x="0" y="1" width="200" height="200" fill="white" style="stroke:black;stroke-width:3;stroke-opacity:1" ></rect>
@@ -247,10 +300,9 @@ function updateSlider(slideAmount) {
 			<text x="25" y="340" font-size="15" fill="black" id="moused_text"> ID </text>
 			<text x="25" y="360" font-size="15" fill="black"> Rate </text>
 			<text x="25" y="380" font-size="15" fill="black" id="moused_text2"> rate </text>
-			
 		</g>
-		
 		</svg>
-		
+		<br /><br />
+		<center><a href="docs.html"><font size="5"> Documentation</font> </a></center>
 	</body>
 </html>

@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+	<header>
+		<meta charset="utf-8">
+	</header>
+	<body>
+		<!--
+		Reference for go back button
+		http://www.w3schools.com/jsref/met_his_back.asp 
+		-->
+		<button onclick="goBack()">Go Back</button>
+
+		<script>
+function goBack() {
+    var t = window.history.back();
+	if (t === undefined) {
+		//window.location.href = 'first.html';
+	}
+}
+		</script>
+
+<br/><br/>
+<b>
+<font size="24">Documentation for Lab 4 </font><br />
+VisGroup 11<br />
+</b><br/><br/><br/>
+
+<font size="5">
+<b> How To Use </b><br /><br />
+The initial display is information of the unemployment rate according to each county.<br/><br/>
+To interact with the graph, click on any county. An orange dot will appear on the county selected.
+On the right hand side of the figure, the county information will display in the top rectangle.
+As the mouse moves around the map, a green circle appears in the county that the mouse is currently hovered over.
+The information for this county will display on the bottom right rectangle.
+This creates an easy to use comparison between any two counties.
+<br/><br/>
+The sliders at the top act as a threshold for minimum and maximum of an unemployment rate to appear, respectively.
+This means that the user can create any range of values to be observed in the map.
+Counties that do not fall in this range will turn light-gray.
+</font>
+<br/><br/><br/><br/>
+<font size="5">
+<b> Sources </b><br/><br/>
+The unemployment information, counties layout and
+initial map can be found at - <a href="http://bl.ocks.org/mbostock/4060606"><b>http://bl.ocks.org/mbostock/4060606</b></a><br/>
+The click-to-zoom can be found at - <a href="https://bl.ocks.org/mbostock/2206590"><b>https://bl.ocks.org/mbostock/2206590</b></a><br/>
+The go back button (on this page) can be found at -
+<a href="http://www.w3schools.com/jsref/met_his_back.asp"><b>http://www.w3schools.com/jsref/met_his_back.asp</b></a><br/> 
+</font>
+
+	</body>
+</html>
