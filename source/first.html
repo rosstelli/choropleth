@@ -44,7 +44,7 @@
 		<script src="d3js.org/queue.v1.min.js"></script>
 		<script src="d3js.org/topojson.v1.min.js"></script>
 		<a>
-		<script>
+<script>
 //
 
 
@@ -190,18 +190,23 @@ function clicked(d) {
 function moused (d) {
 	// Add the display of data of the county of the mouseover.
 	document.getElementById("moused_text").innerHTML = d.id;
-	console.log(d.id);
     document.getElementById("moused_text2").innerHTML = rateById.get(d.id);
 	var centroid = path.centroid(centered);
-	x = centroid[0];
-	y = centroid[1];
+	/* Remove all current circles */
 	g.selectAll('circle').remove();
-	g.append("circle")
-		.attr("cx", x)
-		.attr("cy", y)
-		.attr("r", 1)
-		.attr("fill", "#ffa500")
-		.attr("id", "temp_circle");
+	/* Add a circle for the anchored county */
+	if (centroid[0] && centroid[1]){
+		x = centroid[0];
+		y = centroid[1];
+		
+		g.append("circle")
+			.attr("cx", x)
+			.attr("cy", y)
+			.attr("r", 1)
+			.attr("fill", "#ffa500")
+			.attr("id", "temp_circle");
+	}
+	/* Add a circle for the moused over county */
 	if (d !== centered) {		
 		var selected_loc = path.centroid(d);
 		var x1 = selected_loc[0];
@@ -219,6 +224,8 @@ function moused (d) {
 
 function setSlider () {
     var slide = document.getElementById("slide");
+    var sliderDiv = document.getElementById("sliderAmount");
+    sliderDiv.innerHTML = 'Unemployment > 0' ;
     slide.max = (rateById.get(max) * 100);
     slide.step = rateById.get(max);
     //console.log('set slider');
