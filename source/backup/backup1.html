@@ -62,18 +62,15 @@ var redmin = 0, redmax = 120, greenmin = 0, greenmax = 200, bluemin = 30, bluema
 var threshold = 0, thresholdMax = 1;
 // Toggles visibility of states not in the threshold values.
 var toggleThresh = true; 
-var getInfo = function(arg) {
-    return arg.age;
-}
+
 
 // Function used to convert an unemployment value to a color on the map.
 function getColor(d){
-    if (rateById.get(d.id) == null) {return 'rgb(240,240,240)';}
-	var rate = getInfo(rateById.get(d.id));
+	var rate = rateById.get(d.id);
 	return ("rgb(" 
-	    + Math.floor(((redmax - redmin) * ((getInfo(rateById.get(max)) - rate) / getInfo(rateById.get(max)))) + redmin) + ", "
-		+ Math.floor(((greenmax - greenmin) * ((getInfo(rateById.get(max)) - rate) / getInfo(rateById.get(max)))) + greenmin) + ", "
-		+ Math.floor(((bluemax - bluemin) * ((getInfo(rateById.get(max)) - rate) / getInfo(rateById.get(max)))) + bluemin) +")");
+	    + Math.floor(((redmax - redmin) * ((rateById.get(max) - rate) / rateById.get(max))) + redmin) + ", "
+		+ Math.floor(((greenmax - greenmin) * ((rateById.get(max) - rate) / rateById.get(max))) + greenmin) + ", "
+		+ Math.floor(((bluemax - bluemin) * ((rateById.get(max) - rate) / rateById.get(max))) + bluemin) +")");
 }
 
 // Determines which counties should be colored.
@@ -121,13 +118,7 @@ svg.append("rect")
 // load the data
 queue()
 	.defer(d3.json, "json/us.json")
-	.defer(d3.csv, "data/median_age.csv", function(d) {
-	    var temp = d;
-		temp.employment = +d.employment;
-		temp.age = +d.age;
-		temp.id = +d.id;
-		rateById.set(d.id, temp); 
-	})
+	.defer(d3.tsv, "unemployment.tsv", function(d) { rateById.set(d.id, +d.rate); })
 	.await(ready);
 
 var g = svg.append("g");
@@ -145,13 +136,9 @@ function ready(error, us) {
 	    .data(topojson.feature(us, us.objects.counties).features)
 	  .enter().append("path")
 	    .attr("class", function(d) { 
-		    if (rateById.get(min) == null){ min = d.id; }
-			if (rateById.get(max) == null) { max = d.id; }
-			if ((rateById.get(min) != null) && (rateById.get(d.id) != null)) {
-			    if (rateById.get(min).employment > rateById.get(d.id).employment) { min = d.id; }
-			    if (rateById.get(max).employment < rateById.get(d.id).employment) { max = d.id; }
-			}
-		    //return quantize(rateById.get(d.id).employment); 
+	        if (rateById.get(min) > rateById.get(d.id) || rateById.get(min) == null) { min = d.id; }
+	        if (rateById.get(max) < rateById.get(d.id) || rateById.get(max) == null) { max = d.id; }
+		    return quantize(rateById.get(d.id)); 
         })
 	    .attr("d", path)
 	    .attr("fill", getColor)
@@ -171,7 +158,6 @@ d3.select(self.frameElement).style("height", height + "px");
 // Function called if a click is registered
 function clicked(d) {
     if (d === undefined) return;
-	console.log('Clicked: ' + getInfo(rateById.get(d.id)));
     var x, y, k;
 
     if (d && centered !== d) {
@@ -218,15 +204,12 @@ function clicked(d) {
 
 // Function called as the mouse moves.
 function moused (d) {
-    var temp1 = rateById.get(d.id);
 	// Add the display of data of the county of the mouseover.
 	if (d === undefined) return;
 	
 	// Change the information displayed.
 	document.getElementById("moused_text").innerHTML = d.id;
-	var index = rateById.get(d.id);
-    document.getElementById("moused_text2").innerHTML = index.age;
-	document.getElementById("moused_text3").innerHTML = index.employment;
+    document.getElementById("moused_text2").innerHTML = rateById.get(d.id);
 	g.selectAll('circle').remove();
 	if (centered !== null && centered !== undefined) {
 		var centroid = path.centroid(centered);
@@ -290,41 +273,16 @@ function updateSliderMax(slideAmount) {
 // Keys and their functions
 window.onkeyup = function(e) {
     var key = e.keyCode ? e.keyCode : e.which;
-	console.log(key);
     if (key === 82) { // 'r'
 	    // Toggle the display of the thresholds.
-		toggleThresh = !toggleThresh;
-		redraw();
-	} if (key === 49) {
-	    // '1'
-	    getInfo = function (arg) {return arg.employment;}
-		calculateMaxAndMin();
-		redraw();
-	} if (key === 50) { // '2'
-	    getInfo = function (arg) {return arg.age;}
-		calculateMaxAndMin();
-		redraw();
-	}
-}
-
-function calculateMaxAndMin () {
-    counties.forEach(function (d) {
-		if (rateById.get(min) == null){ min = d.id; }
-		if (rateById.get(max) == null) { max = d.id; }
-		if ((rateById.get(min) != null) && (rateById.get(d.id) != null)) {
-		    if (getInfo(rateById.get(min)) > getInfo(rateById.get(d.id))) { min = d.id; }
-		    if (getInfo(rateById.get(max)) < getInfo(rateById.get(d.id))) { max = d.id; }
+	    if (toggleThresh) {
+		    // Turn on all the counties on the maps, regardless of the thresholds.
+		    counties.attr("fill", getColor);
+		} else {
+		    // Turn on the thresholds again.
+		    counties.attr("fill", thres_color);
 		}
-	});
-}
-
-function redraw() {
-	if (toggleThresh) {
-	    // Turn on the thresholds again.
-	    counties.attr("fill", thres_color);
-	} else {
-		// Turn on all the counties on the maps, regardless of the thresholds.
-		counties.attr("fill", getColor);
+		toggleThresh = !toggleThresh;
 	}
 }
 		</script>
@@ -342,8 +300,6 @@ function redraw() {
 			<text x="25" y="340" font-size="15" fill="black" id="moused_text"> ID </text>
 			<text x="25" y="360" font-size="15" fill="black"> Rate </text>
 			<text x="25" y="380" font-size="15" fill="black" id="moused_text2"> rate </text>
-			<text x="25" y="400" font-size="15" fill="black"> Employment </text>
-			<text x="25" y="420" font-size="15" fill="black" id="moused_text3"> rate </text>
 		</g>
 		</svg>
 		<br /><br />
