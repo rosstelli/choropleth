@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html>
+	<header>
+	<link rel="stylesheet" href="stylesheets/style.css" > 
+  <script src="d3js.org/d3.v3.min.js"></script>
+    <script src="d3js.org/queue.v1.min.js"></script>
+    <script src="d3js.org/topojson.v1.min.js"></script>
+    <script src="d3js.org/crossfilter.js"></script>
+    <script src="d3js.org/jscolor.js"></script>
+    <script src="d3js.org/colorchooser.js"></script>
+		<meta charset="utf-8">
+		<style>
+		
+		.background {
+			fill: none;
+			pointer-events: all;
+			display: inline-block;
+		}
+
+		.counties {
+		  fill: none;
+		}
+
+		#states .active {
+		  fill: orange;
+		}
+
+		.states {
+		  fill: none;
+		  stroke: #fff;
+		  stroke-linejoin: round;
+		}
+/*
+		.q0-9 { fill:rgb(247,251,255); }
+		.q1-9 { fill:rgb(222,235,247); }
+		.q2-9 { fill:rgb(198,219,239); }
+		.q3-9 { fill:rgb(158,202,225); }
+		.q4-9 { fill:rgb(107,174,214); }
+		.q5-9 { fill:rgb(66,146,198); }
+		.q6-9 { fill:rgb(33,113,181); }
+		.q7-9 { fill:rgb(8,81,156); }
+		.q8-9 { fill:rgb(8,48,107); }
+*/
+		</style>
+	</header>
+	<body>
+	    
+	    <!-- <input id="slide" type="range" min="0" max="100" step="1" value="0" onchange="updateSlider(this.value)">
+        <div id="sliderAmount">1.00</div>​ -->
+		
+		<div id="unemployment-chart" class="chart">
+        	<div class="title"><h2>Unemployment Rate</h2></div>
+      </div>
+      <div id="preview">
+        <div id="buttons">
+        <button id="bgcolor-button" style="color: rgb(0, 0, 0); background-image: none; background-color: rgb(255, 255, 255);" class="">Choose Low Value Color</button>
+          <button id="fgcolor-button" style="color: rgb(0, 0, 0); background-image: none; background-color: rgb(171, 37, 103);" class="jscolor-active">Choose High Value Color</button>
+          
+          <button id="set-color">Set Colors</button>
+        </div>
+      </div>
+		<a>
+		
+<script>
+//
+
+
+// http://web.cse.ohio-state.edu/~raghu/teaching/CSE5544/lab4.html
+// http://bl.ocks.org/mbostock/4060606
+// https://bl.ocks.org/mbostock/2206590
+
+var min=0, max=0;
+var redmin = 0, redmax = 120, greenmin = 0, greenmax = 200, bluemin = 30, bluemax = 255;
+var threshold = 0;
+
+var pickers = {};
+
+//$(function colors(){
+var options = {
+  valueElement: null,
+  width: 300,
+  height: 120,
+  sliderSize: 20,
+  position: 'top',
+  borderColor: '#CCC',
+  insetColor: '#CCC',
+  backgroundColor: '#202020'
+};
+
+//
+
+function mod(n, m) {
+        return ((n % m) + m) % m;
+}
+
+function getColor(d){
+	var rate = (1-rateById.get(d.id)/rateById.get(max));
+  var low = pickers.bgcolor.toRGBString().match(/\d+/g);
+  var high = pickers.fgcolor.toRGBString().match(/\d+/g);
+  var result = new Array(3);
+  for (var c = 0; c < 3; c++){
+    result[c] = Math.ceil(low[c] * rate + high[c]*(1-rate));
+  }
+  return "rgb("+result[0]+","+result[1]+","+result[2]+")";
+}
+
+function thres_color(d) {
+  var rate = rateById.get(d.id)
+  if (rate > unemp_lower && rate < unemp_upper) {
+	    return (getColor(d));
+	}
+	return ("rgb(240,240,240)");
+}
+
+pickers.bgcolor = new jscolor('bgcolor-button', options);
+pickers.bgcolor.onFineChange = "update('bgcolor')";
+pickers.bgcolor.fromString('FFFFFF');
+
+pickers.fgcolor = new jscolor('fgcolor-button', options);
+pickers.fgcolor.onFineChange = "update('fgcolor')";
+pickers.fgcolor.fromString('AB2567');
+function update(id) {
+  document.getElementById('bgcolor-button').style.backgroundColor =
+    pickers.bgcolor.toHEXString();
+
+  document.getElementById('preview').style.color =
+  document.getElementById('fgcolor-button').style.borderColor =
+    pickers.fgcolor.toHEXString();
+
+}
+update('bgcolor');
+update('fgcolor');
+
+var unemp_lower = 0;
+var unemp_upper = 0.4;
+var width = 960,
+	height = 600;
+
+var rateById = d3.map();
+
+var centered = null;
+
+var quantize = d3.scale.quantize()
+	.domain([0, .15])
+	.range(d3.range(9).map(function(i) { return "q" + i + "-9"; }));
+
+var projection = d3.geo.albersUsa()
+	.scale(1280)
+	.translate([width / 2, height / 2]);
+
+var path = d3.geo.path()
+	.projection(projection);
+
+var svg = d3.select("body").append("svg")
+	.attr("width", width)
+	.attr("height", height);
+	
+svg.append("rect")
+	.attr("class", "background")
+	.attr("width", width)
+	.attr("height", height)
+	.on("click", clicked);
+	
+
+queue()
+	.defer(d3.json, "json/us.json")
+	.defer(d3.tsv, "unemployment.tsv", function(d) { rateById.set(d.id, +d.rate); })
+	.await(ready);
+
+var g = svg.append("g");
+var counties;
+var us;
+
+/* MAIN FUNCTION */
+function ready(error, us) {
+  if (error) throw error;
+
+  records = rateById.entries()
+  var nestByCounty = d3.nest().key(function(d){return d.value;});
+
+  console.log(us[0]);
+  var record = crossfilter(records),
+  	all = record.groupAll(),
+  	unemployment = record.dimension(function(d){return d.value;}),
+  	unemployments = unemployment.group(function(d){return d;});
+
+  var charts = [
+  	barChart()
+  		.dimension(unemployment)
+  		.group(unemployments)
+  		.x(d3.scale.linear()
+  			.domain([0, .4])
+  			.rangeRound([0, 10* 80]))
+  ];
+
+  var chart = d3.selectAll(".chart")
+  	.data(charts)
+  	.each(function(chart) {chart.on("brush", renderAll).on("brushend", renderAll);});
+
+  var map = d3.selectAll(".counties")
+  		.data([filterMap]);
+
+  counties = g.append("g")
+	.attr("class", "counties")
+	.selectAll("path")
+	.data(topojson.feature(us, us.objects.counties).features)
+	.enter().append("path")
+	.attr("class", function(d) { 
+	    if (rateById.get(min) > rateById.get(d.id) || rateById.get(min) == null) { min = d.id; }
+	    if (rateById.get(max) < rateById.get(d.id) || rateById.get(max) == null) { max = d.id; }
+		  return quantize(rateById.get(d.id)); 
+      })
+	  .attr("d", path)
+	  .attr("fill", thres_color)
+	  .on("click", clicked)
+	  .on("mouseover", moused);
+
+	//setSlider ();
+    
+  g.append("path")
+	  .datum(topojson.mesh(us, us.objects.states, function(a, b) { return a !== b; }))
+	  .attr("class", "states")
+	  .attr("d", path)
+	  ;
+  document.getElementById("set-color").addEventListener("click", function(){
+    counties.attr("fill", thres_color);
+  });
+  renderAll();
+  /* Create Color controls */
+
+	function render(method){ d3.select(this).call(method);}
+
+  function renderAll(){
+  	chart.each(render);
+  	counties.attr("fill", thres_color);
+  }
+
+  window.filter = function(filters) {
+    filters.forEach(function(d, i) { charts[i].filter(d); });
+    renderAll();
+  };
+
+  window.reset = function(i) {
+    charts[i].filter(null);
+    renderAll();
+  };
+}
+
+d3.select(self.frameElement).style("height", height + "px");
+
+function clicked(d) {
+  console.log('alert');
+  var x, y, k;
+
+  if (d && centered !== d) {
+	// Center around a county or state.
+	var centroid = path.centroid(d);
+	x = centroid[0];
+	y = centroid[1];
+	k = 4;
+	centered = d;
+	var temp_circle = document.getElementById("temp_circle");
+	if (temp_circle != null) {
+		temp_circle = null;
+	}
+	g.selectAll('circle').remove();
+	g.append("circle")
+		.attr("cx", x)
+		.attr("cy", y)
+		.attr("r", 1)
+		.attr("fill", "#ffa500")
+		.attr("id", "temp_circle");
+  } else {
+	x = width / 2;
+	y = height / 2;
+	k = 1;
+	centered = null;
+	
+  }
+
+  g.selectAll("path")
+	  .classed("active", centered && function(d) { return d === centered; });
+
+  g.transition()
+	  .duration(750)
+	  .attr("transform", "translate(" + width / 2 + "," + height / 2 + ")scale(" + k + ")translate(" + -x + "," + -y + ")")
+	  .style("stroke-width", 1.5 / k + "px");
+	  
+  // Add the display of data of the county clicked.
+  document.getElementById("selected_text").innerHTML = d.id;
+  document.getElementById("selected_text2").innerHTML = rateById.get(d.id);
+  
+  
+}
+
+
+
+function moused (d) {
+	// Add the display of data of the county of the mouseover.
+	document.getElementById("moused_text").innerHTML = d.id;
+    document.getElementById("moused_text2").innerHTML = rateById.get(d.id);
+	var centroid = path.centroid(centered);
+	/* Remove all current circles */
+	g.selectAll('circle').remove();
+	/* Add a circle for the anchored county */
+	if (centroid[0] && centroid[1]){
+		x = centroid[0];
+		y = centroid[1];
+		
+		g.append("circle")
+			.attr("cx", x)
+			.attr("cy", y)
+			.attr("r", 1)
+			.attr("fill", "#ffa500")
+			.attr("id", "temp_circle");
+	}
+	/* Add a circle for the moused over county */
+	if (d !== centered) {		
+		var selected_loc = path.centroid(d);
+		var x1 = selected_loc[0];
+		var y1 = selected_loc[1];
+		
+		g.append("circle")
+			.attr("cx", x1)
+			.attr("cy", y1)
+			.attr("r", 1)
+			.attr("fill", "#66FF00")
+			.attr("id", "temp_selected");
+	}
+}
+
+
+function setSlider () {
+    var slide = document.getElementById("slide");
+    var sliderDiv = document.getElementById("sliderAmount");
+    sliderDiv.innerHTML = 'Unemployment > 0' ;
+    slide.max = (rateById.get(max) * 100);
+    slide.step = rateById.get(max);
+    //console.log('set slider');
+}
+
+
+// Slider 
+function updateSlider(slideAmount) {
+    var sliderDiv = document.getElementById("sliderAmount");
+    sliderDiv.innerHTML = 'Unemployment > ' + (slideAmount / 100);
+	threshold = (slideAmount / 100);
+	counties.attr("fill", thres_color);
+}
+function filterMap(div){
+	counties.attr("fill", thres_color);
+}
+function barChart() {
+    if (!barChart.id) barChart.id = 0;
+
+    var margin = {top: 10, right: 10, bottom: 20, left: 10},
+        x,
+        y = d3.scale.linear().range([100, 0]),
+        id = barChart.id++,
+        axis = d3.svg.axis().orient("bottom"),
+        brush = d3.svg.brush(),
+        brushDirty,
+        dimension,
+        group,
+        round;
+
+    function chart(div) {
+      var width = x.range()[1],
+          height = y.range()[0];
+
+      y.domain([0, group.top(1)[0].value]);
+
+      div.each(function() {
+        var div = d3.select(this),
+            g = div.select("g");
+
+        // Create the skeletal chart.
+        if (g.empty()) {
+          div.select(".title").append("a")
+              .attr("href", "javascript:reset(" + id + ")")
+              .attr("class", "reset")
+              .text("reset")
+              .style("display", "none");
+
+          g = div.append("svg")
+              .attr("width", width + margin.left + margin.right)
+              .attr("height", height + margin.top + margin.bottom)
+            .append("g")
+              .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+          g.append("clipPath")
+              .attr("id", "clip-" + id)
+            .append("rect")
+              .attr("width", width)
+              .attr("height", height);
+
+          g.selectAll(".bar")
+              .data(["background", "foreground"])
+            .enter().append("path")
+              .attr("class", function(d) { return d + " bar"; })
+              .datum(group.all());
+
+          g.selectAll(".foreground.bar")
+              .attr("clip-path", "url(#clip-" + id + ")");
+
+          g.append("g")
+              .attr("class", "axis")
+              .attr("transform", "translate(0," + height + ")")
+              .call(axis);
+
+          // Initialize the brush component with pretty resize handles.
+          var gBrush = g.append("g").attr("class", "brush").call(brush);
+          gBrush.selectAll("rect").attr("height", height);
+          gBrush.selectAll(".resize").append("path").attr("d", resizePath);
+        }
+
+        // Only redraw the brush if set externally.
+        if (brushDirty) {
+          brushDirty = false;
+          g.selectAll(".brush").call(brush);
+          div.select(".title a").style("display", brush.empty() ? "none" : null);
+          if (brush.empty()) {
+            g.selectAll("#clip-" + id + " rect")
+                .attr("x", 0)
+                .attr("width", width);
+          } else {
+            var extent = brush.extent();
+            g.selectAll("#clip-" + id + " rect")
+                .attr("x", x(extent[0]))
+                .attr("width", x(extent[1]) - x(extent[0]));
+          }
+        }
+
+        g.selectAll(".bar").attr("d", barPath);
+      });
+
+      function barPath(groups) {
+        var path = [],
+            i = -1,
+            n = groups.length,
+            d;
+        while (++i < n) {
+          d = groups[i];
+          path.push("M", x(d.key), ",", height, "V", y(d.value), "h9V", height);
+        }
+        return path.join("");
+      }
+
+      function resizePath(d) {
+        var e = +(d == "e"),
+            x = e ? 1 : -1,
+            y = height / 3;
+        return "M" + (.5 * x) + "," + y
+            + "A6,6 0 0 " + e + " " + (6.5 * x) + "," + (y + 6)
+            + "V" + (2 * y - 6)
+            + "A6,6 0 0 " + e + " " + (.5 * x) + "," + (2 * y)
+            + "Z"
+            + "M" + (2.5 * x) + "," + (y + 8)
+            + "V" + (2 * y - 8)
+            + "M" + (4.5 * x) + "," + (y + 8)
+            + "V" + (2 * y - 8);
+      }
+    }
+
+    brush.on("brushstart.chart", function() {
+      var div = d3.select(this.parentNode.parentNode.parentNode);
+      div.select(".title a").style("display", null);
+    });
+
+    brush.on("brush.chart", function() {
+      var g = d3.select(this.parentNode),
+          extent = brush.extent();
+      if (round) g.select(".brush")
+          .call(brush.extent(extent = extent.map(round)))
+        .selectAll(".resize")
+          .style("display", null);
+      g.select("#clip-" + id + " rect")
+          .attr("x", x(extent[0]))
+          .attr("width", x(extent[1]) - x(extent[0]));
+      dimension.filterRange(extent);
+	    /* REMEMBER what you did */
+	    unemp_lower = extent[0];
+	    unemp_upper = extent[1];
+	    /* DUDE  */
+    });
+
+    brush.on("brushend.chart", function() {
+      if (brush.empty()) {
+        var div = d3.select(this.parentNode.parentNode.parentNode);
+        div.select(".title a").style("display", "none");
+        div.select("#clip-" + id + " rect").attr("x", null).attr("width", "100%");
+        dimension.filterAll();
+      }
+    });
+
+    chart.margin = function(_) {
+      if (!arguments.length) return margin;
+      margin = _;
+      return chart;
+    };
+
+    chart.x = function(_) {
+      if (!arguments.length) return x;
+      x = _;
+      axis.scale(x);
+      brush.x(x);
+      return chart;
+    };
+
+    chart.y = function(_) {
+      if (!arguments.length) return y;
+      y = _;
+      return chart;
+    };
+
+    chart.dimension = function(_) {
+      if (!arguments.length) return dimension;
+      dimension = _;
+      return chart;
+    };
+
+    chart.filter = function(_) {
+      if (_) {
+        brush.extent(_);
+        dimension.filterRange(_);
+      } else {
+        brush.clear();
+        dimension.filterAll();
+      }
+      brushDirty = true;
+      return chart;
+    };
+
+    chart.group = function(_) {
+      if (!arguments.length) return group;
+      group = _;
+      return chart;
+    };
+
+    chart.round = function(_) {
+      if (!arguments.length) return round;
+      round = _;
+      return chart;
+    };
+
+    return d3.rebind(chart, brush, "on");
+}
+		</script>
+		</a>
+		
+		<svg width="250" height="600" fill="none" class="background">
+		<g>
+		    <rect x="0" y="1" width="200" height="200" fill="white" style="stroke:black;stroke-width:3;stroke-opacity:1" ></rect>
+		    <text x="25" y="20" font-size="15" fill="blue"> Selected County ID: </text>
+			<text x="25" y="40" font-size="15" fill="black" id="selected_text"> Click a County </text>
+			<text x="25" y="60" font-size="15" fill="black"> Rate </text>
+			<text x="25" y="80" font-size="15" fill="black" id="selected_text2"> Click a County </text>
+			<rect x="0" y="301" width="200" height="200" fill="white" style="stroke:black;stroke-width:3;stroke-opacity:1" ></rect>
+			<text x="25" y="320" font-size="15" fill="blue"> Current County ID: </text>
+			<text x="25" y="340" font-size="15" fill="black" id="moused_text"> ID </text>
+			<text x="25" y="360" font-size="15" fill="black"> Rate </text>
+			<text x="25" y="380" font-size="15" fill="black" id="moused_text2"> rate </text>
+			
+		</g>
+		
+		</svg>
+		
+	</body>
+</html>

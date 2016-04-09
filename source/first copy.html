@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html>
+	<header>
+		<meta charset="utf-8">
+		<style>
+		
+		.background {
+			fill: none;
+			pointer-events: all;
+			display: inline-block;
+		}
+
+		.counties {
+		  fill: none;
+		  stroke-width: 3px;
+		}
+
+		#states .active {
+		  fill: orange;
+		}
+
+		.states {
+		  fill: none;
+		  stroke: #fff;
+		  stroke-linejoin: round;
+		}
+/*
+		.q0-9 { fill:rgb(247,251,255); }
+		.q1-9 { fill:rgb(222,235,247); }
+		.q2-9 { fill:rgb(198,219,239); }
+		.q3-9 { fill:rgb(158,202,225); }
+		.q4-9 { fill:rgb(107,174,214); }
+		.q5-9 { fill:rgb(66,146,198); }
+		.q6-9 { fill:rgb(33,113,181); }
+		.q7-9 { fill:rgb(8,81,156); }
+		.q8-9 { fill:rgb(8,48,107); }
+*/
+		</style>
+	</header>
+	<body>
+	    
+	    <input id="slide" type="range" min="0" max="100" step="1" value="0" onchange="updateSlider(this.value)">
+        <div id="sliderAmount">1.00</div>​
+		<script src="d3js.org/d3.v3.min.js"></script>
+		<script src="d3js.org/queue.v1.min.js"></script>
+		<script src="d3js.org/topojson.v1.min.js"></script>
+		<a>
+<script>
+//
+
+
+// http://web.cse.ohio-state.edu/~raghu/teaching/CSE5544/lab4.html
+// http://bl.ocks.org/mbostock/4060606
+// https://bl.ocks.org/mbostock/2206590
+
+var min=0, max=0;
+var redmin = 0, redmax = 120, greenmin = 0, greenmax = 200, bluemin = 30, bluemax = 255;
+var threshold = 0;
+
+function getColor(d){
+    //console.log(rateById.get(d.id));
+	var rate = rateById.get(d.id);
+	//console.log(rate + " color " + Math.floor(((247 - 8) * (rate / rateById.get(max))) + 8));
+	return ("rgb(" 
+	    + Math.floor(((redmax - redmin) * ((rateById.get(max) - rate) / rateById.get(max))) + redmin) + ", "
+		+ Math.floor(((greenmax - greenmin) * ((rateById.get(max) - rate) / rateById.get(max))) + greenmin) + ", "
+		+ Math.floor(((bluemax - bluemin) * ((rateById.get(max) - rate) / rateById.get(max))) + bluemin) +")");
+}
+
+function thres_color(d) {
+    var rate = rateById.get(d.id)
+    if (rate > threshold) {
+	    return (getColor(d));
+	}
+	return ("rgb(240,240,240)");
+}
+
+// var dragGroup = d3.behavior.drag()
+//     .on('dragstart', function () {
+//     console.log('Start Dragging Group');
+// })
+//     .on('drag', function (d, i) {
+//     // d.x += d3.event.dx;
+//     // d.y += d3.event.dy;
+//     // d3.select(this).attr("transform", "translate(" + d.x + "," + d.y + ")");
+// });
+
+var width = 960,
+	height = 600;
+
+var rateById = d3.map();
+
+var centered = null;
+
+var quantize = d3.scale.quantize()
+	.domain([0, .15])
+	.range(d3.range(9).map(function(i) { return "q" + i + "-9"; }));
+
+var projection = d3.geo.albersUsa()
+	.scale(1280)
+	.translate([width / 2, height / 2]);
+
+// var zoom = d3.behavior.zoom()
+// 	.scaleExtent([1, 8])
+// 	.on("zoom", zoomed);
+
+var path = d3.geo.path()
+	.projection(projection);
+
+var svg = d3.select("body").append("svg")
+	.attr("width", width)
+	.attr("height", height);
+	
+var g = svg.append("g");
+
+svg.append("rect")
+	.attr("class", "background")
+	.attr("width", width)
+	.attr("height", height)
+	//.on("click", clicked)
+	//.call(dragGroup)
+	
+	;
+// svg
+// 	.call(zoom);
+// 	.call(zoom.event);
+
+
+
+queue()
+	.defer(d3.json, "json/us.json")
+	.defer(d3.tsv, "unemployment.tsv", function(d) { rateById.set(d.id, +d.rate); })
+	.await(ready);
+
+
+var counties ;
+// = g.append("g")
+// 	.attr("class", "counties")
+// 	.selectAll("path")
+	
+function ready(error, us) {
+  if (error) throw error;
+
+  /* Set Counties up */
+  counties = g.append("g")
+	.attr("class", "counties")
+	.selectAll("path")
+	.data(topojson.feature(us, us.objects.counties).features)
+	.enter().append("path")
+	  .attr("class", function(d) { 
+	      if (rateById.get(min) > rateById.get(d.id) || rateById.get(min) == null) { min = d.id; }
+	      if (rateById.get(max) < rateById.get(d.id) || rateById.get(max) == null) { max = d.id; }
+		  return quantize(rateById.get(d.id)); 
+      })
+	  .attr("d", path)
+	  .attr("fill", getColor)
+	  .style("stroke-width", "10px")
+	  .on("click", clicked)
+	  .on("mouseover", moused)
+	;
+	  //.call(dragMap);
+
+	setSlider ();
+
+	/* Set States up */
+  	g.append("path")
+	  .datum(topojson.mesh(us, us.objects.states, function(a, b) { return a !== b; }))
+	  .attr("class", "states")
+	  .attr("d", path)
+	  ;
+}
+
+var dragMap = d3.behavior.drag()
+	.on('dragstart', function(){
+		d3.event.sourceEvent.stopPropagation();
+	}).on('drag', function(d, i){
+		d.cx += d3.event.dx;
+    	d.cy += d3.event.dy;
+    	d3.select(this).attr('cx', d.cx).attr('cy', d.cy)
+	})
+
+
+function clicked(d) {
+  //if (d3.event.defaultPrevented) return;
+  console.log('alert');
+  var x, y, k;
+
+  if (d && centered !== d) {
+	// Center around a county or state.
+	var centroid = path.centroid(d);
+	x = centroid[0];
+	y = centroid[1];
+	k = 4;
+	centered = d;
+	var temp_circle = document.getElementById("temp_circle");
+	if (temp_circle != null) {
+		temp_circle = null;
+	}
+	g.selectAll('circle').remove();
+	g.append("circle")
+		.attr("cx", x)
+		.attr("cy", y)
+		.attr("r", 1)
+		.attr("fill", "#ffa500")
+		.attr("id", "temp_circle");
+  } else {
+	x = width / 2;
+	y = height / 2;
+	k = 1;
+	centered = null;
+	
+  }
+
+  g.selectAll("path")
+	  .classed("active", centered && function(d) { return d === centered; });
+
+  g.transition()
+	  .duration(750)
+	  .attr("transform", "translate(" + width / 2 + "," + height / 2 + ")scale(" + k + ")translate(" + -x + "," + -y + ")")
+	  .style("stroke-width", 1.5 / k + "px");
+	  
+  // Add the display of data of the county clicked.
+  document.getElementById("selected_text").innerHTML = d.id;
+  document.getElementById("selected_text2").innerHTML = rateById.get(d.id);
+  
+  
+}
+
+
+
+function moused (d) {
+	// Add the display of data of the county of the mouseover.
+	document.getElementById("moused_text").innerHTML = d.id;
+    document.getElementById("moused_text2").innerHTML = rateById.get(d.id);
+    document.getElementById(d.id);
+	var centroid = path.centroid(centered);
+	/* Remove all current circles */
+	g.selectAll('circle').remove();
+	/* Add a circle for the anchored county */
+	if (centroid[0] && centroid[1]){
+		x = centroid[0];
+		y = centroid[1];
+		
+		g.append("circle")
+			.attr("cx", x)
+			.attr("cy", y)
+			.attr("r", 1)
+			.attr("fill", "#ffa500")
+			.attr("id", "temp_circle");
+	}
+	/* Add a circle for the moused over county */
+	if (d !== centered) {		
+		var selected_loc = path.centroid(d);
+		var x1 = selected_loc[0];
+		var y1 = selected_loc[1];
+		
+		g.append("circle")
+			.attr("cx", x1)
+			.attr("cy", y1)
+			.attr("r", 1)
+			.attr("fill", "#66FF00")
+			.attr("id", "temp_selected");
+	}
+}
+
+
+function setSlider () {
+    var slide = document.getElementById("slide");
+    var sliderDiv = document.getElementById("sliderAmount");
+    sliderDiv.innerHTML = 'Unemployment > 0' ;
+    slide.max = (rateById.get(max) * 100);
+    slide.step = rateById.get(max);
+    //console.log('set slider');
+}
+
+
+// Slider 
+function updateSlider(slideAmount) {
+    var sliderDiv = document.getElementById("sliderAmount");
+    sliderDiv.innerHTML = 'Unemployment > ' + (slideAmount / 100);
+	threshold = (slideAmount / 100);
+	counties.attr("fill", thres_color);
+}
+
+function zoomed() {
+  g.attr("transform", "translate(" + d3.event.translate + ")scale(" + d3.event.scale + ")");
+  //g.on("mouseover", moused)
+}
+
+d3.select(self.frameElement).style("height", height + "px");
+
+</script>
+
+		</a>
+		
+		<svg width="250" height="600" fill="none" class="background">
+		<g>
+		    <rect x="0" y="1" width="200" height="200" fill="white" style="stroke:black;stroke-width:3;stroke-opacity:1" ></rect>
+		    <text x="25" y="20" font-size="15" fill="blue"> Selected County ID: </text>
+			<text x="25" y="40" font-size="15" fill="black" id="selected_text"> Click a County </text>
+			<text x="25" y="60" font-size="15" fill="black"> Rate </text>
+			<text x="25" y="80" font-size="15" fill="black" id="selected_text2"> Click a County </text>
+			<rect x="0" y="301" width="200" height="200" fill="white" style="stroke:black;stroke-width:3;stroke-opacity:1" ></rect>
+			<text x="25" y="320" font-size="15" fill="blue"> Current County ID: </text>
+			<text x="25" y="340" font-size="15" fill="black" id="moused_text"> ID </text>
+			<text x="25" y="360" font-size="15" fill="black"> Rate </text>
+			<text x="25" y="380" font-size="15" fill="black" id="moused_text2"> rate </text>
+			
+		</g>
+		
+		</svg>
+		
+	</body>
+</html>
