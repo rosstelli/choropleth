@@ -45,7 +45,7 @@
 		</style>
 	</header>
 	<body onhashchange="hashListener()">
-	    
+	    <h1> Unemployment Choropleth </h1>
 	    <!-- <input id="slide" type="range" min="0" max="100" step="1" value="0" onchange="updateSlider(this.value)">
         <div id="sliderAmount">1.00</div>​ -->
 		
@@ -54,18 +54,17 @@
       </div>
       <div id="preview">
         <div id="buttons">
-        <button id="bgcolor-button" style="color: rgb(0, 0, 0); background-image: none; background-color: rgb(255, 255, 255);" class="">Choose Low Value Color</button>
-          <button id="fgcolor-button" style="color: rgb(0, 0, 0); background-image: none; background-color: rgb(171, 37, 103);" class="jscolor-active">Choose High Value Color</button>
-          
-          <button id="set-color">Set Colors</button>
+        <button id="bgcolor-button" style="color: rgb(0, 0, 0); background-image: none; background-color: rgb(255, 255, 255);" class="btn">Choose Low Value Color</button>
+          <button id="fgcolor-button" style="color: rgb(0, 0, 0); background-image: none; background-color: rgb(171, 37, 103);" class="btn jscolor-active">Choose High Value Color</button>
           <div class="dropdown">
             <button id="data_select" onclick="openDrop()" class="dropbtn">DropDown</button>
             <div id="dataDropdown" class="dropdown-content">
+              <a href="#unemployment">Unemployment</a>
               <a href="#age">Age</a>
               <a href="#population">Population</a>
               <a href="#deaths">Deaths</a>
               <a href="#births">Births</a>
-              <a href="#unemployment">Unemployment</a>
+              
             </div>
           </div>
         </div>
@@ -104,8 +103,9 @@ function mod(n, m) {
         return ((n % m) + m) % m;
 }
 
-function sig(x){
-  return 1 / (1+ Math.pow(Math.E, -x));
+function toTitleCase(str)
+{
+    return str.replace(/\w\S*/g, function(txt){return txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase();});
 }
 
 function getColor(d){
@@ -132,6 +132,8 @@ function thres_color(d) {
 function hashListener(){
   selected = location.hash.replace('#', '');
   document.getElementById("data_select").innerHTML = selected;
+  document.getElementById("selected_display_type").innerHTML = toTitleCase(selected);
+  document.getElementById("display_type").innerHTML = toTitleCase(selected);
   superRenderAll();
 }
 
@@ -144,7 +146,9 @@ function create_accessor(arg){
 
 function getDomain () {
   if (cross_records){
-    return d3.extent(cross_records, accessor);
+    [min1, max1] = d3.extent(cross_records, accessor);
+    if (min1 < 0){ min1 = 0;}
+    return [min1, max1];
   } else {
     return [0,1];
   }
@@ -169,7 +173,13 @@ function update(id) {
   document.getElementById('preview').style.color =
   document.getElementById('fgcolor-button').style.borderColor =
     pickers.fgcolor.toHEXString();
-
+  var bars = document.querySelector(".foreground.bar");
+  if (bars){  
+    bars.style.fill = pickers.fgcolor.toHEXString();
+  }
+  if (superRenderAll){
+    superRenderAll();
+  }
 }
 update('bgcolor');
 update('fgcolor');
@@ -207,11 +217,12 @@ svg.append("rect")
 
 queue()
 	.defer(d3.json, "json/us.json")
-	.defer(d3.csv, "data/all_data2.csv", function(d) {
+	.defer(d3.csv, "data/all_data3.csv", function(d) {
   //  .defer(d3.tsv, "unemployment.tsv", function(d) {
 //    if (d.id % 1000 == 0){return null;}
     //ids[d.id] = rec_i++;
     records[d.id] = {
+      unemployment: +d.unemployment,
       age: +d.age,
       id: +d.id,
       name: d.name,
@@ -220,8 +231,8 @@ queue()
       //pct_emply: (d.pct_emply > 0.9)? 0.9 : d.employment / d.population, // Data not correct.
       //est: +d.private_establishments,
       money: +d.private_payroll,
-      deaths: d.deaths? +d.deaths : 0,
-      births: d.births? +d.births : 0
+      deaths: d.deaths? +d.deaths : -1,
+      births: d.births? +d.births : -1
     };
   })
 	.await(ready);
@@ -233,8 +244,8 @@ var counties;
 var us;
 var records = {};
 var cross_records;
-var selected = 'age';
-var filtered = 'age';
+var selected = 'unemployment';
+var filtered = 'unemployment';
 var superRenderAll;
 /* MAIN FUNCTION */
 function ready(error, us) {
@@ -255,16 +266,18 @@ cross_records = Object.keys(records).map(function (key) {records[key].index = i+
   		.dimension(unemployment)
   		.group(unemployments)
   		.x(d3.scale.linear()
-  			.domain(d3.extent(cross_records, create_accessor(selected)))
+  			.domain(getDomain())
   			.rangeRound([0, 10* 80]))
   ];
 
   var chart = d3.selectAll(".chart")
   	.data(charts)
   	.each(function(chart) {chart.on("brush", renderAll).on("brushend", renderAll);});
-
+  var bars
   var map = d3.selectAll(".counties")
   		.data([filterMap]);
+
+
 
   [min, max] = getDomain();
   [lower, upper] = getDomain();
@@ -289,12 +302,16 @@ cross_records = Object.keys(records).map(function (key) {records[key].index = i+
 	  .attr("class", "states")
 	  .attr("d", path)
 	  ;
-  document.getElementById("set-color").addEventListener("click", function(){
-    [min, max] = getDomain();
-    counties.attr("class", function(d){return quantize(findRecord(d.id, selected));})
-    counties.attr("fill", thres_color);
-  });
+  // document.getElementById("set-color").addEventListener("click", function(){
+  //   [min, max] = getDomain();
+  //   counties.attr("class", function(d){return quantize(findRecord(d.id, selected));})
+  //   counties.attr("fill", thres_color);
+  // });
   renderAll();
+    var bars = document.querySelector(".foreground.bar");
+  if (bars){  
+    bars.style.fill = 'AB2567';
+  }
   /* Create Color controls */
 
 	function render(method){ d3.select(this).call(method);}
@@ -637,17 +654,19 @@ function barChart(name) {
 		    <rect x="0" y="1" width="200" height="200" fill="white" style="stroke:black;stroke-width:3;stroke-opacity:1" ></rect>
 		    <text x="25" y="20" font-size="15" fill="blue"> Selected County ID: </text>
 			<text x="25" y="40" font-size="15" fill="black" id="selected_text"> Click a County </text>
-			<text x="25" y="60" font-size="15" fill="black"> Rate </text>
+			<text x="25" y="60" font-size="15" fill="black" id="selected_display_type"> Rate </text>
 			<text x="25" y="80" font-size="15" fill="black" id="selected_text2"> Click a County </text>
 			<rect x="0" y="301" width="200" height="200" fill="white" style="stroke:black;stroke-width:3;stroke-opacity:1" ></rect>
 			<text x="25" y="320" font-size="15" fill="blue"> Current County ID: </text>
 			<text x="25" y="340" font-size="15" fill="black" id="moused_text"> ID </text>
-			<text x="25" y="360" font-size="15" fill="black"> Rate </text>
-			<text x="25" y="380" font-size="15" fill="black" id="moused_text2"> rate </text>
+			<text x="25" y="360" font-size="15" fill="black" id="display_type"> Rate </text>
+			<text x="25" y="380" font-size="15" fill="black" id="moused_text2"> 0 </text>
 			
 		</g>
 		
 		</svg>
-		
+		    <div align="center" >
+        <font size="4">Project by David Campbell and Ross Donatelli - <a href="docs.html"> Documentation </a></font>
+    </div>
 	</body>
 </html>
