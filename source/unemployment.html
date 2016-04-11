@@ -2,13 +2,13 @@
 <html>
 	<header>
 	<link rel="stylesheet" href="stylesheets/style.css" > 
-  <script src="d3js.org/d3.v3.min.js"></script>
-    <script src="d3js.org/queue.v1.min.js"></script>
-    <script src="d3js.org/topojson.v1.min.js"></script>
-    <script src="d3js.org/crossfilter.js"></script>
-    <script src="d3js.org/jscolor.js"></script>
-    <script src="d3js.org/colorchooser.js"></script>
-    <script src="d3js.org/dropdown.js"></script>
+  <script src="javascripts/d3.v3.min.js"></script>
+    <script src="javascripts/queue.v1.min.js"></script>
+    <script src="javascripts/topojson.v1.min.js"></script>
+    <script src="javascripts/crossfilter.js"></script>
+    <script src="javascripts/jscolor.js"></script>
+    <script src="javascripts/colorchooser.js"></script>
+    <script src="javascripts/dropdown.js"></script>
 		<meta charset="utf-8">
 		<style>
 		
@@ -216,8 +216,8 @@ svg.append("rect")
 	
 
 queue()
-	.defer(d3.json, "json/us.json")
-	.defer(d3.csv, "data/all_data3.csv", function(d) {
+	.defer(d3.json, "data/us.json")
+	.defer(d3.csv, "data/all_data.csv", function(d) {
   //  .defer(d3.tsv, "unemployment.tsv", function(d) {
 //    if (d.id % 1000 == 0){return null;}
     //ids[d.id] = rec_i++;
