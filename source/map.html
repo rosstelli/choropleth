@@ -93,6 +93,10 @@ function mod(n, m) {
         return ((n % m) + m) % m;
 }
 
+function sig(x){
+  return 1 / (1+ Math.pow(Math.E, -x));
+}
+
 function getColor(d){
 	var rate = (1-rateById.get(d.id)/rateById.get(max));
   var low = pickers.bgcolor.toRGBString().match(/\d+/g);
@@ -181,8 +185,8 @@ function ready(error, us) {
   console.log(us[0]);
   var record = crossfilter(records),
   	all = record.groupAll(),
-  	unemployment = record.dimension(function(d){return d.value;}),
-  	unemployments = unemployment.group(function(d){return d;});
+  	unemployment = record.dimension(function(d){console.log(d);return d.value;}),
+  	unemployments = unemployment.group(function(d){console.log("group: "+d);return d;});
 
   var charts = [
   	barChart()

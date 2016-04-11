@@ -20,7 +20,6 @@
 
 		.counties {
 		  fill: none;
-		  /*stroke: #FFFFFF;  /* Color used for county lines */ 
 		}
 
 		#states .active {
@@ -50,24 +49,25 @@
 	    <!-- <input id="slide" type="range" min="0" max="100" step="1" value="0" onchange="updateSlider(this.value)">
         <div id="sliderAmount">1.00</div>​ -->
 		
-		<div id="age-chart" class="chart">
-        	<div class="title"><h2>Median Age</h2></div>
+		<div id="unemployment-chart" class="chart">
+        	<div class="title"><h2>Unemployment Rate</h2></div>
       </div>
       <div id="preview">
         <div id="buttons">
-          <button id="bgcolor-button" style="color: rgb(0, 0, 0); background-image: none; background-color: rgb(255, 255, 255);" class="">Choose Low Value Color</button>
+        <button id="bgcolor-button" style="color: rgb(0, 0, 0); background-image: none; background-color: rgb(255, 255, 255);" class="">Choose Low Value Color</button>
           <button id="fgcolor-button" style="color: rgb(0, 0, 0); background-image: none; background-color: rgb(171, 37, 103);" class="jscolor-active">Choose High Value Color</button>
           
           <button id="set-color">Set Colors</button>
-
           <div class="dropdown">
             <button id="data_select" onclick="openDrop()" class="dropbtn">DropDown</button>
             <div id="dataDropdown" class="dropdown-content">
               <a href="#age">Age</a>
               <a href="#population">Population</a>
+              <a href="#deaths">Deaths</a>
+              <a href="#births">Births</a>
+              <a href="#unemployment">Unemployment</a>
             </div>
           </div>
-
         </div>
       </div>
 		<a>
@@ -83,7 +83,6 @@
 var min=0, max=0;
 var redmin = 0, redmax = 120, greenmin = 0, greenmax = 200, bluemin = 30, bluemax = 255;
 var threshold = 0;
-var toggleThresh = true; 
 
 var pickers = {};
 
@@ -100,24 +99,14 @@ var options = {
 };
 
 //
-function hashListener(){
-  selected = location.hash.replace('#', '');
-  document.getElementById("data_select").innerHTML = selected;
-  [min, max] = getDomain();
-}
-
-var accessor = function(d){ return d[selected];}
-
-function create_accessor(arg){
-  var a = function(d){return d[arg];}
-  return a;
-}
 
 function mod(n, m) {
         return ((n % m) + m) % m;
 }
 
-
+function sig(x){
+  return 1 / (1+ Math.pow(Math.E, -x));
+}
 
 function getColor(d){
 	var rate = findRecord(d.id, selected)/max;
@@ -131,17 +120,44 @@ function getColor(d){
 }
 
 function thres_color(d) {
-    var rate = findRecord(d.id, selected);
-	//console.log(rate + ' ' + unemp_lower + ' ' + unemp_upper);
-    if (rate > min && rate < max) {
+  var rate = findRecord(d.id, selected);
+  var filter = findRecord(d.id, filtered);
+  if (rate >= min && rate <= max
+     && filter >= lower && filter <= upper) {
 	    return (getColor(d));
 	}
 	return ("rgb(240,240,240)");
 }
 
+function hashListener(){
+  selected = location.hash.replace('#', '');
+  document.getElementById("data_select").innerHTML = selected;
+  superRenderAll();
+}
+
+var accessor = function(d){ return d[selected];}
+
+function create_accessor(arg){
+  var a = function(d){return d[arg];}
+  return a;
+}
+
+function getDomain () {
+  if (cross_records){
+    return d3.extent(cross_records, accessor);
+  } else {
+    return [0,1];
+  }
+}
+
+function findRecord(id, field){
+  var r = records[id];
+  return r ? r[field] : null;
+}
+
 pickers.bgcolor = new jscolor('bgcolor-button', options);
 pickers.bgcolor.onFineChange = "update('bgcolor')";
-pickers.bgcolor.fromString('EEEEEE');
+pickers.bgcolor.fromString('rgb(240,240,240)');
 
 pickers.fgcolor = new jscolor('fgcolor-button', options);
 pickers.fgcolor.onFineChange = "update('fgcolor')";
@@ -158,31 +174,12 @@ function update(id) {
 update('bgcolor');
 update('fgcolor');
 
-var unemp_lower = 0;
-var unemp_upper = 100;
-var domain_lower = 19,
-    domain_upper = 71; // The domain of the chart.
-
-function getDomain () {
-  if (cross_records){
-    return d3.extent(cross_records, accessor);
-  } else {
-    return [0,1];
-  }
-}
-
-
+var lower;
+var upper;
 var width = 960,
 	height = 600;
 
 var rateById = d3.map();
-
-// VERY important variable. Returns the current selection of data!
-var getInfo = function(arg) {
-    if  (arg === undefined) {return null;}
-    return arg.age;
-}
-
 
 var centered = null;
 
@@ -206,82 +203,59 @@ svg.append("rect")
 	.attr("width", width)
 	.attr("height", height)
 	.on("click", clicked);
+	
 
-var rec_i = 0;
-var records = {};
-var ids = {};
-function findRecord(id, field){
-  var r = records[id];
-  return r ? r[field] : null;
-}
-// ADD new variables here.
 queue()
 	.defer(d3.json, "json/us.json")
-	//.defer(d3.csv, "data/all_data2.csv", function(d) {
-    .defer(d3.tsv, "unemployment.tsv", function(d) {
+	.defer(d3.csv, "data/all_data2.csv", function(d) {
+  //  .defer(d3.tsv, "unemployment.tsv", function(d) {
 //    if (d.id % 1000 == 0){return null;}
-    ids[d.id] = rec_i++;
+    //ids[d.id] = rec_i++;
     records[d.id] = {
-      rate: +d.rate,
-      //age: +d.age/100,
-      key: d.id,
-      //name: d.name,
-      //population: +d.population,
+      age: +d.age,
+      id: +d.id,
+      name: d.name,
+      population: +d.population,
       //pct_emply: d.employment / d.population;
       //pct_emply: (d.pct_emply > 0.9)? 0.9 : d.employment / d.population, // Data not correct.
       //est: +d.private_establishments,
-      //money: +d.private_payroll,
-      //death: +d.death,
-      //birth: +d.birth
+      money: +d.private_payroll,
+      deaths: d.deaths? +d.deaths : 0,
+      births: d.births? +d.births : 0
     };
-    })
-  //     // other way of doing it
-  // 	 //    var temp = d;
-  // 		// temp.employment = +d.employment;
-  // 		// temp.age = +d.age;
-  // 		// temp.id = +d.id;
-  // 		// temp.name = d.name;
-  // 		// temp.population = +d.population;
-  // 		// temp.pct_emply = d.employment / d.population;
-  // 		// if (temp.pct_emply > 0.9) {temp.pct_emply = 0.9; } // Data not correct.
-  // 		// temp.est = +d.private_establishments;
-  // 		// temp.money = +d.private_payroll;
-  // 		// temp.death = +d.death;
-  // 		// temp.birth = +d.birth;
-  // 		// rateById.set(d.id, temp); 
-  //     //
-  //     }},
-  //      function (error, rows){
-  //     records = rows;
-  //   }
-  // )
+  })
 	.await(ready);
 
+var min_bounds = {};
+var max_bounds = {};
 var g = svg.append("g");
 var counties;
-var mus;
+var us;
+var records = {};
 var cross_records;
-var selected = "rate";
+var selected = 'age';
+var filtered = 'age';
+var superRenderAll;
 /* MAIN FUNCTION */
 function ready(error, us) {
   if (error) throw error;
-  //records = rateById.entries()
-  //var nestByCounty = d3.nest().key(function(d){ return d.age;}); // Unused?
-// HERE IS THE PROBLEM
-  var i = 0;
-  cross_records = Object.keys(records).map(function (key) {records[key].index = i++; return records[key]});
-  mus = us;
+
+  //ecords = rateById.entries()
+  var nestByCounty = d3.nest().key(function(d){return d.value;});
+  var i= 0;
+cross_records = Object.keys(records).map(function (key) {records[key].index = i++; return records[key]});
+  console.log(us[0]);
   var record = crossfilter(cross_records),
   	all = record.groupAll(),
-  	population = record.dimension(function(d){console.log(d);return d.rate;}),
-  	populations = population.group(function(d) {console.log("groupL:"+d);return d;});
+  	unemployment = record.dimension(function(d){return d[selected];}),
+  	unemployments = unemployment.group(function(d){return d;});
 
   var charts = [
-  	barChart()
-  		.dimension(population)
-  		.group(populations)
+  	barChart(selected)
+  		.dimension(unemployment)
+  		.group(unemployments)
   		.x(d3.scale.linear()
-  			.domain(d3.extent(cross_records, create_accessor("rate")) )
+  			.domain(d3.extent(cross_records, create_accessor(selected)))
   			.rangeRound([0, 10* 80]))
   ];
 
@@ -293,13 +267,16 @@ function ready(error, us) {
   		.data([filterMap]);
 
   [min, max] = getDomain();
+  [lower, upper] = getDomain();
 
   counties = g.append("g")
 	.attr("class", "counties")
 	.selectAll("path")
 	.data(topojson.feature(us, us.objects.counties).features)
 	.enter().append("path")
-  .attr("class", function(d){return quantize(findRecord(d.id, 'rate'));})
+	.attr("class", function(d) { 
+		  return quantize(findRecord(d.id, selected)); 
+      })
 	  .attr("d", path)
 	  .attr("fill", thres_color)
 	  .on("click", clicked)
@@ -313,21 +290,23 @@ function ready(error, us) {
 	  .attr("d", path)
 	  ;
   document.getElementById("set-color").addEventListener("click", function(){
+    [min, max] = getDomain();
     counties.attr("class", function(d){return quantize(findRecord(d.id, selected));})
     counties.attr("fill", thres_color);
   });
   renderAll();
   /* Create Color controls */
 
-  
-
 	function render(method){ d3.select(this).call(method);}
 
   function renderAll(){
   	chart.each(render);
-    //counties.attr("class", function(d){return quantize(findRecord(d.id, selected));})
+    [min, max] = getDomain();
+    counties.attr("class", function(d){return quantize(findRecord(d.id, selected));})
   	counties.attr("fill", thres_color);
   }
+
+  superRenderAll = renderAll;
 
   window.filter = function(filters) {
     filters.forEach(function(d, i) { charts[i].filter(d); });
@@ -337,18 +316,23 @@ function ready(error, us) {
   window.reset = function(i) {
     charts[i].filter(null);
     renderAll();
-	
-	// Had to add these lines for some reason, don't know why
-	// but must've changed something so that this needs to be redrawn.
-	//toggleThresh = false;
-	//redraw();
   };
+
+  function createChart(){
+    barChart(selected)
+      .dimension(unemployment)
+      .group(unemployments)
+      .x(d3.scale.linear()
+        .domain(d3.extent(cross_records, create_accessor(selected)))
+        .rangeRound([0, 10* 80]))
+
+  }
 }
 
 d3.select(self.frameElement).style("height", height + "px");
 
 function clicked(d) {
-    if (d === undefined) return;
+  console.log('alert');
   var x, y, k;
 
   if (d && centered !== d) {
@@ -368,7 +352,7 @@ function clicked(d) {
 		.attr("cy", y)
 		.attr("r", 1)
 		.attr("fill", "#ffa500")
-		.attr('stroke', '#111111');
+		.attr("id", "temp_circle");
   } else {
 	x = width / 2;
 	y = height / 2;
@@ -386,8 +370,8 @@ function clicked(d) {
 	  .style("stroke-width", 1.5 / k + "px");
 	  
   // Add the display of data of the county clicked.
-  document.getElementById("selected_text").innerHTML = findRecord(d.id, 'name'); // Show the county name.
-  document.getElementById("selected_text2").innerHTML = findRecord(d.id, selected);
+  document.getElementById("selected_text").innerHTML = findRecord(d.id, 'name');
+    document.getElementById("selected_text2").innerHTML = findRecord(d.id, selected);
   
   
 }
@@ -396,7 +380,7 @@ function clicked(d) {
 
 function moused (d) {
 	// Add the display of data of the county of the mouseover.
-	document.getElementById("moused_text").innerHTML = findRecord(d.id, 'name'); // Show the county name.
+	document.getElementById("moused_text").innerHTML = findRecord(d.id, 'name');
     document.getElementById("moused_text2").innerHTML = findRecord(d.id, selected);
 	var centroid = path.centroid(centered);
 	/* Remove all current circles */
@@ -411,7 +395,7 @@ function moused (d) {
 			.attr("cy", y)
 			.attr("r", 1)
 			.attr("fill", "#ffa500")
-			.attr('stroke', '#111111');
+			.attr("id", "temp_circle");
 	}
 	/* Add a circle for the moused over county */
 	if (d !== centered) {		
@@ -424,34 +408,32 @@ function moused (d) {
 			.attr("cy", y1)
 			.attr("r", 1)
 			.attr("fill", "#66FF00")
-			.attr('stroke', '#111111');
+			.attr("id", "temp_selected");
 	}
 }
 
 
-// function setSlider () {
-//     var slide = document.getElementById("slide");
-//     var sliderDiv = document.getElementById("sliderAmount");
-//     sliderDiv.innerHTML = 'Unemployment > 0' ;
-//     slide.max = (getInfo(rateById.get(max)) * 100);
-//     slide.step = getInfo(rateById.get(max));
-//     //console.log('set slider');
-// }
+function setSlider () {
+    var slide = document.getElementById("slide");
+    var sliderDiv = document.getElementById("sliderAmount");
+    sliderDiv.innerHTML = 'Unemployment > 0' ;
+    slide.max = (rateById.get(max) * 100);
+    slide.step = rateById.get(max);
+    //console.log('set slider');
+}
 
 
-// // Slider 
-// function updateSlider(slideAmount) {
-//     var sliderDiv = document.getElementById("sliderAmount");
-//     sliderDiv.innerHTML = 'Unemployment > ' + (slideAmount / 100);
-// 	threshold = (slideAmount / 100);
-// 	counties.attr("fill", thres_color);
-// }
-
+// Slider 
+function updateSlider(slideAmount) {
+    var sliderDiv = document.getElementById("sliderAmount");
+    sliderDiv.innerHTML = 'Unemployment > ' + (slideAmount / 100);
+	threshold = (slideAmount / 100);
+	counties.attr("fill", thres_color);
+}
 function filterMap(div){
 	counties.attr("fill", thres_color);
 }
-
-function barChart() {
+function barChart(name) {
     if (!barChart.id) barChart.id = 0;
 
     var margin = {top: 10, right: 10, bottom: 20, left: 10},
@@ -463,6 +445,7 @@ function barChart() {
         brushDirty,
         dimension,
         group,
+        type = name,
         round;
 
     function chart(div) {
@@ -542,7 +525,7 @@ function barChart() {
             d;
         while (++i < n) {
           d = groups[i];
-          path.push("M", x(d.key), ",", height, "V", y(getInfo(d.value)), "h9V", height);
+          path.push("M", x(d.key), ",", height, "V", y(d.value), "h9V", height);
         }
         return path.join("");
       }
@@ -580,8 +563,8 @@ function barChart() {
           .attr("width", x(extent[1]) - x(extent[0]));
       dimension.filterRange(extent);
 	    /* REMEMBER what you did */
-	    unemp_lower = extent[0]; // Hmmm..
-	    unemp_upper = extent[1];
+	    lower = extent[0];
+	    upper = extent[1];
 	    /* DUDE  */
     });
 
@@ -647,7 +630,6 @@ function barChart() {
     return d3.rebind(chart, brush, "on");
 }
 		</script>
-		<script src="scripts/toggle.js"></script>
 		</a>
 		
 		<svg width="250" height="600" fill="none" class="background">
@@ -655,22 +637,17 @@ function barChart() {
 		    <rect x="0" y="1" width="200" height="200" fill="white" style="stroke:black;stroke-width:3;stroke-opacity:1" ></rect>
 		    <text x="25" y="20" font-size="15" fill="blue"> Selected County ID: </text>
 			<text x="25" y="40" font-size="15" fill="black" id="selected_text"> Click a County </text>
-			<text x="25" y="60" font-size="15" fill="black"> Value </text>
+			<text x="25" y="60" font-size="15" fill="black"> Rate </text>
 			<text x="25" y="80" font-size="15" fill="black" id="selected_text2"> Click a County </text>
 			<rect x="0" y="301" width="200" height="200" fill="white" style="stroke:black;stroke-width:3;stroke-opacity:1" ></rect>
 			<text x="25" y="320" font-size="15" fill="blue"> Current County ID: </text>
 			<text x="25" y="340" font-size="15" fill="black" id="moused_text"> ID </text>
-			<text x="25" y="360" font-size="15" fill="black"> Value </text>
-			<text x="25" y="380" font-size="15" fill="black" id="moused_text2"> value </text>
+			<text x="25" y="360" font-size="15" fill="black"> Rate </text>
+			<text x="25" y="380" font-size="15" fill="black" id="moused_text2"> rate </text>
 			
 		</g>
 		
 		</svg>
-		<br/>
-		<div align="center" >
-		    <font size="4">Project by David Campbell and Ross Donatelli - <a href="docs.html"> Documentation </a></font>
-		</div>
 		
 	</body>
-</html>
 </html>
