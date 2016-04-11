@@ -21,7 +21,7 @@ function goBack() {
 
 <br/><br/>
 <b>
-<font size="24">Documentation for Lab 4 </font><br />
+<font size="8">Documentation for Lab 4 </font><br />
 VisGroup 11<br />
 </b><br/><br/><br/>
 
@@ -30,24 +30,22 @@ VisGroup 11<br />
 <!-- Describe functionality of the tool. -->
 <font size="5">
 <b> How To Use </b><br /><br />
-The initial display is information of the median age according to each county.<br/><br/>
+The initial display is information of the unemployment according to each county.<br/><br/>
 To interact with the graph, click on any county. An orange dot will appear on the county selected.
 On the right hand side of the figure, the county information will display in the top rectangle.
 As the mouse moves around the map, a green circle appears in the county that the mouse is currently hovered over.
 The information for this county will display on the bottom right rectangle.
 This creates an easy to use comparison between any two counties.
 <br/><br/>
-The sliders at the top act as a threshold for minimum and maximum of an unemployment rate to appear, respectively.
+The sliders at the top act as a threshold for minimum and maximum of an unemployment rate to appear.
 This means that the user can create any range of values to be observed in the map.
 Counties that do not fall in this range will turn light-gray.
 <br/><br/>
-To select different datasets, simply press a number key between 1 and 7. The information for each will display as such:
+To select different datasets, click the third green button. A dropdown will display the different datasets to select from:
 <ol>
-    <li> Population</li>
+    <li> Unemployment rate</li>
 	<li> Median Age</li>
-	<li> Percentage of Population Employed</li>
-	<li> Private nonfarm Establishments</li>
-	<li> Private nonfarm annual payroll</li>
+	<li> Population</li>
 	<li> Births Per 1000 People</li>
 	<li> Deaths Per 1000 People</li>
 </ol>
@@ -67,32 +65,7 @@ initial map can be found at - <a href="http://bl.ocks.org/mbostock/4060606"><b>h
 The click-to-zoom can be found at - <a href="https://bl.ocks.org/mbostock/2206590"><b>https://bl.ocks.org/mbostock/2206590</b></a><br/>
 The other data references can be found at -
 <a href="https://www.census.gov/support/USACdataDownloads.html"><b>https://www.census.gov/support/USACdataDownloads.html</b></a><br/> 
-The go back button (on this page) can be found at -
-<a href="http://www.w3schools.com/jsref/met_his_back.asp"><b>http://www.w3schools.com/jsref/met_his_back.asp</b></a><br/> 
 <!-- End Sources -->
-
-<!-- Developer Notes -->
-<br/><br/><b> Developer Notes </b><br/><br/>
-To add a new data set, add the data to a column in the all_data.csv file in the data folder. Name the column appropriately.
-In the following code add the appropriate line to load data in:<br/>
-<font size="4" face="lucida console">queue()<br/>
-	.defer(d3.json, "json/us.json")<br/>
-	.defer(d3.csv, "data/all_data.csv", function(d) {<br/>
-		<b>temp.data = +d.data;</b><br/>
-		rateById.set(d.id, temp); <br/>
-	})<br/>
-	.await(ready);<br/></font>
-<br/>
-In the scripts/toggle.js file, add a function to 
-<font size="4" face="lucida console"><b>var functions</b></font>
-that coordinates with the new value added.
-Copy and paste a previous function as a 'template'.<br/>
-The last step, add a listener to a key that has not been used yet.
-For a template copy any if statement (except <font size="4" face="lucida console"> <b>(key === 82)</b></font>) in the 
-<font size="4" face="lucida console"><b>window.onkeyup</b></font>
-function. Make sure to adjust parameters as necessary.
-<br/>
-<!-- End Developer Notes -->
 
 
 <!-- Begin Data Referencing -->
@@ -100,13 +73,11 @@ function. Make sure to adjust parameters as necessary.
 <b> Data </b><br/><br/>
 The data that was used was:
 <ul>
-    <li> Median age (2007) </li>
-	<li> Population (2007) </li>
-	<li> Estimated Employment (2007) </li>
-	<li> Births per 1000 (2007) </li>
-	<li> Deaths per 1000 (2007) </li>
-	<li> Private nonfarm establishments (2007) </li>
-	<li> Private nonfarm annual payroll (2007) </li>
+	<li> Unemployment rate</li>
+	<li> Median Age (2007)</li>
+	<li> Population (2007)</li>
+	<li> Births Per 1000 People (2007)</li>
+	<li> Deaths Per 1000 People (2007)</li>
 </ul>
 </font>
 
